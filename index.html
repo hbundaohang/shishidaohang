@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>校园导航 - 智能助手</title>
+    <!-- 使用CDN Leaflet库 + 国内可用瓦片 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="./style.css">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 地图容器 -->
+        <div class="map-container" id="map-container">
+            <div id="map"></div>
+
+            <!-- 顶部工具栏 -->
+            <div class="top-toolbar" id="top-toolbar">
+                <button class="menu-btn" id="menu-btn" onclick="togglePanel()">☰</button>
+                <div class="location-info">
+                    <span>校园导航</span>
+                    <span id="location-info-text" class="location-coords"></span>
+                </div>
+            </div>
+
+            <!-- 右上角控制按钮组（指北针 + 定位） -->
+            <div class="location-controls" id="location-controls">
+                <button class="loc-btn" id="follow-btn" title="指北针">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                        <circle cx="12" cy="12" r="10" fill="#fff" stroke="#666" stroke-width="1"/>
+                        <polygon points="12,4 15.5,12 12,10 8.5,12" fill="#dc3545"/>
+                        <polygon points="12,20 15.5,12 12,14 8.5,12" fill="#999"/>
+                        <text x="12" y="3.5" text-anchor="middle" font-size="4" font-weight="bold" fill="#dc3545">N</text>
+                        <line x1="12" y1="4" x2="12" y2="20" stroke="#ddd" stroke-width="0.5"/>
+                        <line x1="2" y1="12" x2="22" y2="12" stroke="#ddd" stroke-width="0.5"/>
+                    </svg>
+                </button>
+                <button class="loc-btn" id="locate-btn" title="定位当前位置" onclick="useCurrentLocation()">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="currentColor"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 快速导航浮动条 -->
+            <div class="quick-nav-bar" id="quick-nav-bar" style="display: none;">
+                <div class="quick-nav-content">
+                    <span id="quick-start">🚩 起点</span>
+                    <span>→</span>
+                    <span id="quick-end">🎯 终点</span>
+                    <button class="quick-nav-btn" onclick="quickNavigate()">导航</button>
+                    <button class="close-quick-nav" onclick="closeQuickNav()">✕</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 控制面板 -->
+        <div class="control-panel" id="control-panel">
+            <div class="panel-handle" id="panel-handle"></div>
+
+            <div class="panel-tabs" id="panel-tabs">
+                <button class="tab-btn active" data-tab="nav">🗺️ 导航</button>
+                <button class="tab-btn" data-tab="search">🔍 搜索</button>
+                <button class="tab-btn" data-tab="buildings">🏛️ 建筑</button>
+            </div>
+
+            <div class="tab-content active" id="tab-nav">
+                <div class="nav-form">
+                    <div class="input-group">
+                        <label class="start-label">🚩 起点</label>
+                        <div class="input-with-btn">
+                            <input type="text" id="start-input" placeholder="选择起点..." autocomplete="off">
+                            <button class="input-action-btn" onclick="useCurrentLocation()" title="使用当前位置">📍</button>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label class="end-label">🎯 终点</label>
+                        <input type="text" id="end-input" placeholder="选择终点..." autocomplete="off">
+                    </div>
+                    <div class="nav-btn-group">
+                        <button id="navigate-btn" class="nav-btn">规划路线</button>
+                        <button id="realtime-nav-btn" class="nav-btn realtime-btn">🧭 实时导航</button>
+                    </div>
+                    <div id="nav-result" class="nav-result"></div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-search">
+                <div class="search-form">
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="搜索建筑名称或别名..." autocomplete="off">
+                        <button id="search-btn">搜索</button>
+                    </div>
+                    <div id="search-result" class="search-result"></div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-buildings">
+                <div class="building-list-header">
+                    <span>校园建筑</span>
+                </div>
+                <div id="building-list" class="building-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./map.js"></script>
+
+    <!-- 定位权限请求弹窗 -->
+    <div class="permission-overlay" id="permission-overlay" style="display:none;">
+        <div class="permission-dialog">
+            <div class="permission-icon">📍</div>
+            <h3 class="permission-title">需要定位权限</h3>
+            <p class="permission-desc" id="permission-desc">为了提供准确的实时导航和位置服务，需要获取您的当前位置。您的位置信息仅用于导航，不会被存储。</p>
+            <div class="permission-btns">
+                <button class="permit-deny-btn" id="permission-deny-btn">拒绝</button>
+                <button class="permit-allow-btn" id="permission-allow-btn">允许定位</button>
+            </div>
+            <div class="permission-guide" id="permission-guide" style="display:none;">
+                <p>定位权限已被拒绝，请按以下步骤开启：</p>
+                <div class="guide-steps" id="guide-steps"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 定位状态指示器 -->
+    <div class="location-status-bar" id="location-status-bar" style="display:none;">
+        <span class="status-icon" id="loc-status-icon">📍</span>
+        <span class="status-text" id="loc-status-text">正在定位...</span>
+        <button class="status-close-btn" id="loc-status-close">&times;</button>
+    </div>
+</body>
+</html>
