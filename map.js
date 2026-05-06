@@ -349,7 +349,7 @@ class CampusNavigator {
 }
 
 // 全局导航实例
-let navigator = null;
+let campusNavigator = null;
 
 
 // ==================== 坐标系转换（WGS-84 → GCJ-02） ====================
@@ -614,8 +614,8 @@ function loadRoadsFromData() {
 
     const roads = CAMPUS_DATA.roads || [];
     roads.forEach(road => {
-        const fromCoord = navigator?.nodes[road.from]?.coordinates || findNodeCoord(road.from);
-        const toCoord = navigator?.nodes[road.to]?.coordinates || findNodeCoord(road.to);
+        const fromCoord = campusNavigator?.nodes[road.from]?.coordinates || findNodeCoord(road.from);
+        const toCoord = campusNavigator?.nodes[road.to]?.coordinates || findNodeCoord(road.to);
         if (!fromCoord || !toCoord) return;
 
         const fromLatLng = [fromCoord[1], fromCoord[0]];
@@ -669,7 +669,7 @@ function loadBuildingConnections() {
 }
 
 function findNodeCoord(nodeId) {
-    if (navigator && navigator.nodes[nodeId]) return navigator.nodes[nodeId].coordinates;
+    if (campusNavigator && campusNavigator.nodes[nodeId]) return campusNavigator.nodes[nodeId].coordinates;
     for (const b of CAMPUS_DATA.buildings) { if (b.id === nodeId) return b.coordinates; }
     for (const i of (CAMPUS_DATA.intersections||[])) { if (i.id === nodeId) return i.coordinates; }
     return null;
@@ -1405,7 +1405,7 @@ async function rerouteFromCurrentPosition(currentPos){
         if(navigationPath)reroutePathBackup=[...navigationPath];
 
         // 使用本地导航引擎重新规划
-        const result=navigator.navigateFromGPS(currentPos.lat,currentPos.lng,navigationDestination);
+        const result=campusNavigator.navigateFromGPS(currentPos.lat,currentPos.lng,navigationDestination);
         if(result.success){
             if(currentPathLayer)currentPathLayer.setStyle({opacity:0.2});
             await new Promise(r=>setTimeout(r,250));
@@ -1565,7 +1565,7 @@ async function navigateFromGPSSimple(gpsPosition, endName) {
     const navBtn=document.getElementById('navigate-btn');
     if(navBtn){navBtn.disabled=true;navBtn.textContent='计算中...';}
     try{
-        const result=navigator.navigateFromGPS(gpsPosition.lat,gpsPosition.lng,endName);
+        const result=campusNavigator.navigateFromGPS(gpsPosition.lat,gpsPosition.lng,endName);
         handleNavigationResult(result,'当前位置',endName);
     }catch(error){console.error('导航失败:',error);showToast('导航失败','error');}
     finally{const nb=document.getElementById('navigate-btn');if(nb){nb.disabled=false;nb.textContent='开始导航';}}
@@ -1575,19 +1575,19 @@ async function performNavigationLocal(start, end) {
     const navBtn=document.getElementById('navigate-btn');
     if(navBtn){navBtn.disabled=true;navBtn.textContent='计算中...';}
     try{
-        const [startId,startNode]=navigator.searchBuilding(start);
-        const [endId,endNode]=navigator.searchBuilding(end);
+        const [startId,startNode]=campusNavigator.searchBuilding(start);
+        const [endId,endNode]=campusNavigator.searchBuilding(end);
 
         if(!startId||!startNode){showToast(`找不到起点: ${start}`,'error');return;}
         if(!endId||!endNode){showToast(`找不到终点: ${end}`,'error');return;}
 
-        const result=navigator.findShortestPath(startId,endId);
+        const result=campusNavigator.findShortestPath(startId,endId);
         if(!result.success){showToast(result.error||'无法计算路径','error');return;}
 
         const pathCoordinates=result.path.map(id=>({
-            node_id:id,name:navigator.nodes[id].name,
-            lat:navigator.nodes[id].coordinates[1],lng:navigator.nodes[id].coordinates[0],
-            type:navigator.nodes[id].type
+            node_id:id,name:campusNavigator.nodes[id].name,
+            lat:campusNavigator.nodes[id].coordinates[1],lng:campusNavigator.nodes[id].coordinates[0],
+            type:campusNavigator.nodes[id].type
         }));
 
         handleNavigationResultLocal({
@@ -1712,7 +1712,7 @@ function searchBuilding() {
     const query = document.getElementById('search-input')?.value.trim();
     if (!query) { showToast('请输入建筑名称', 'warning'); return; }
 
-    const [bid, building] = navigator.searchBuilding(query);
+    const [bid, building] = campusNavigator.searchBuilding(query);
     const resultEl = document.getElementById('search-result');
 
     if (building && resultEl) {
@@ -1766,7 +1766,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('[环境] 安全上下文:', window.isSecureContext);
 
     // 初始化导航引擎（纯JS实现，无需后端）
-    navigator = new CampusNavigator(CAMPUS_DATA);
+    campusNavigator = new CampusNavigator(CAMPUS_DATA);
 
     detectDevice();
     initMap();
