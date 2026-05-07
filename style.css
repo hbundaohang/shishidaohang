@@ -3,11 +3,14 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
 }
 
 html, body {
     width: 100%;
     height: 100%;
+    height: 100dvh;
     overflow: hidden;
     position: fixed;
     top: 0;
@@ -20,6 +23,25 @@ body {
     background: #000;
 }
 
+::selection {
+    background: rgba(102, 126, 234, 0.3);
+}
+
+/* 移动端滚动优化 */
+* {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 禁止长按弹出菜单 */
+img, a, button, .building-item {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+button {
+    touch-action: manipulation;
+}
+
 /* ==================== 主容器 ==================== */
 .app-container {
     position: fixed;
@@ -29,6 +51,7 @@ body {
     bottom: 0;
     width: 100%;
     height: 100%;
+    height: 100dvh;
     overflow: hidden;
 }
 
@@ -125,13 +148,30 @@ body {
 
 /* ==================== 手机端布局 (<768px) ==================== */
 @media (max-width: 767px) {
+    .app-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden;
+    }
+
     .control-panel {
+        position: absolute;
         bottom: 0;
         left: 0;
         right: 0;
-        max-height: 60vh;
+        max-height: 65vh;
+        background: white;
+        z-index: 20;
+        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 -2px 20px rgba(0,0,0,0.12);
+        overflow: visible;
         border-radius: 20px 20px 0 0;
-        transform: translateY(85%);
+        transform: translateY(calc(100% - 50px));
+        touch-action: pan-y;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
     .control-panel.open {
@@ -140,21 +180,169 @@ body {
 
     .panel-handle {
         display: block;
+        width: 40px;
+        height: 4px;
+        background: #ddd;
+        border-radius: 2px;
+        margin: 10px auto 6px;
+        cursor: pointer;
+        flex-shrink: 0;
     }
 
     .panel-tabs {
         display: flex;
         border-bottom: 1px solid #eee;
-        padding: 0 16px;
-    }
-
-    .menu-btn {
-        display: flex;
+        padding: 0 12px;
+        flex-shrink: 0;
     }
 
     .tab-content {
-        max-height: calc(60vh - 50px);
+        max-height: calc(65vh - 100px);
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+
+    .tab-content.active {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .nav-btn-group {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .nav-result, .search-result {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    /* 定位控制按钮调整 */
+    .location-controls {
+        right: 10px;
+        top: 62px;
+        gap: 8px;
+    }
+
+    .loc-btn {
+        width: 40px;
+        height: 40px;
+    }
+
+    /* 顶部工具栏调整 */
+    .top-toolbar {
+        padding: 10px 12px;
+        padding-top: env(safe-area-inset-top, 10px);
+    }
+
+    .location-info {
+        font-size: 14px;
+    }
+
+    .location-coords {
+        font-size: 10px;
+    }
+
+    /* 导航面板在移动端的适配 */
+    .navigation-panel {
+        bottom: 12px;
+        width: 94%;
+        max-width: 380px;
+        border-radius: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .nav-panel-content {
+        padding: 14px;
+    }
+
+    .nav-arrow {
+        width: 48px;
+        height: 48px;
+        font-size: 24px;
+        flex-shrink: 0;
+    }
+
+    .nav-instruction {
+        font-size: 15px;
+        min-width: 0;
+        word-break: break-word;
+    }
+
+    .nav-distance {
+        font-size: 18px;
+    }
+
+    .nav-info {
+        padding: 12px 0;
+    }
+
+    .nav-cancel-btn {
+        padding: 10px 0;
+        font-size: 14px;
+    }
+
+    /* 建筑弹出窗适配 */
+    .building-list {
+        padding-bottom: 16px;
+    }
+
+    .building-item {
+        padding: 12px;
+    }
+
+    /* 输入框适配触摸 */
+    .input-group input,
+    .input-with-btn input,
+    .search-box input {
+        font-size: 16px; /* 防止iOS自动缩放 */
+        padding: 11px;
+    }
+
+    .nav-btn {
+        padding: 12px;
+        font-size: 15px;
+    }
+
+    /* 快速导航条适配 */
+    .quick-nav-bar {
+        bottom: 16px;
+        left: 12px;
+        right: 12px;
+    }
+
+    .quick-nav-content {
+        padding: 8px 12px;
+        gap: 6px;
+    }
+
+    .quick-nav-content span {
+        font-size: 12px;
+    }
+
+    .quick-nav-btn {
+        padding: 5px 12px;
+        font-size: 12px;
+    }
+
+    /* 权限弹窗适配 */
+    .permission-dialog {
+        margin: 0 16px;
+        padding: 24px 20px 20px;
+    }
+
+    /* 建筑标签适配 */
+    .building-label {
+        font-size: 10px;
+        padding: 2px 6px;
+    }
+
+    .building-rect {
+        width: 30px;
+        height: 30px;
     }
 }
 
@@ -1068,6 +1256,8 @@ body {
     box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     z-index: 2000;
     overflow: hidden;
+    /* 当移动端控制面板打开时，导航面板上移 */
+    transition: bottom 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-panel-header {
