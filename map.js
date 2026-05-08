@@ -425,7 +425,6 @@ let smoothedSpeed = 0;                  // 平滑后的速度
 let gpsQualityLevel = 'unknown';        // GPS质量等级
 let consecutivePoorGPS = 0;             // 连续低质量GPS计数
 let navTotalDistance = 0;               // 路线总距离（用于进度%计算）
-let navPanelRefreshTimer = null;        // 面板1秒刷新定时器
 
 // 自动重规划相关
 let isRerouting = false;
@@ -1365,15 +1364,10 @@ function startGPSWatchdog() {
     gpsWatchdogTimer = setInterval(() => {
         if (!isRealTimeNavigating) return;
         const elapsed = Date.now() - lastGPSUpdateTime;
-        const instructionEl = document.getElementById('nav-instruction');
-        if (instructionEl) {
-            if (elapsed > 15000 && !navigationPath) {
-                instructionEl.textContent = '⚠️ 无法获取 GPS 信号，请检查定位权限';
-            } else if (elapsed > 8000 && lastPosition === null) {
-                instructionEl.textContent = '📡 正在获取 GPS 位置...';
-            } else if (elapsed > 5000 && lastPosition === null) {
-                instructionEl.textContent = '正在定位...';
-            }
+        if (elapsed > 15000 && !navigationPath) {
+            showToast('⚠️ 无法获取 GPS 信号，请检查定位权限', 'warning');
+        } else if (elapsed > 8000 && lastPosition === null) {
+            // 静默等待，不频繁提示
         }
     }, 2000);
 }
@@ -1540,11 +1534,10 @@ async function beginNavigation() {
 
         showToast('🧭 实时导航已启动','success');
         updateNavigationUI();
-        showNavigationPanel(initialNavData);
         
         startGPSWatchdog();
         
-        // 如果已有位置信息，立即更新一次面板
+        // 如果已有位置信息，立即更新一次
         if(lastPosition){
             setTimeout(()=>{if(isRealTimeNavigating)updateRealTimeNavigation(lastPosition);},500);
         }
@@ -1578,11 +1571,7 @@ function updateRealTimeNavigation(currentPos){
         if(now-lastRerouteTime>REROUTE_COOLDOWN_MS&&rerouteCount<MAX_REROUTE_COUNT){
             rerouteFromCurrentPosition(currentPos);return;
         }else if(rerouteCount>=MAX_REROUTE_COUNT){
-            updateNavigationPanel({
-                remainingDistance:Math.round(calculateDistance(currentPos,navigationPath[navigationPath.length-1])),
-                etaMinutes:'?',nextTurn:null,deviation:Math.round(minDist),
-                rerouting:false,maxReroutesReached:true
-            });return;
+            showToast('⛔ 偏离路线较远且已达最大重算次数','warning');return;
         }
     }
 
@@ -1652,19 +1641,6 @@ function updateRealTimeNavigation(currentPos){
             if(traveledPoints.length>=2)window.traveledPathLayer.setLatLngs(traveledPoints.map(p=>[p.lat,p.lng]));
         }
     }
-
-    // 9. 更新导航面板
-    updateNavigationPanel({
-        remainingDistance:Math.round(remainingDistance),
-        etaMinutes:etaMinutes,
-        nextTurn,
-        deviation:minDist>15?Math.round(minDist):0,
-        rerouting:false,
-        instruction:instructionText,
-        speed:Math.round(smoothedSpeed * 10)/10,
-        quality:gpsQualityLevel,
-        distToEnd:Math.round(distToEnd)
-    });
 
     if(isFollowingUser)map.panTo([currentPos.lat,currentPos.lng],{animate:true,duration:0.3});
 }
@@ -1751,262 +1727,12 @@ function stopRealTimeNavigation(){
     if(currentStartMarker){map.removeLayer(currentStartMarker);currentStartMarker=null;}
     if(currentEndMarker){map.removeLayer(currentEndMarker);currentEndMarker=null;}
 
-    stopRealTimeLocation();hideNavigationPanel();showToast('导航已结束');
-}
-
-function showNavigationPanel(initialData){
-    let panel=document.getElementById('navigation-panel');
-    if(!panel){
-        panel=document.createElement('div');panel.id='navigation-panel';panel.className='navigation-panel';
-        const distText=initialData?`${initialData.distance||'--'} m`:'-- m';
-        const etaText=initialData?`${initialData.eta||'--'} 分钟`:'-- 分钟';
-        const instructionText=initialData?.instruction||(initialData?.endName?`前往 ${initialData.endName}`:'正在获取位置...');
-        const now=new Date();
-        const timeStr=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-        panel.innerHTML=`
-            <div class="nav-panel-header">
-                <span class="nav-status"id="nav-status">🧭 导航中</span>
-                <span class="nav-clock" id="nav-clock" style="font-size:12px;color:rgba(255,255,255,0.7);">${timeStr}</span>
-                <button class="nav-close-btn"onclick="stopRealTimeNavigation()">✕</button>
-            </div>
-            <div class="nav-panel-content">
-                <!-- 导航指令区 -->
-                <div class="nav-direction">
-                    <div class="nav-arrow"id="nav-arrow">↑</div>
-                    <div class="nav-instruction" id="nav-instruction" style="transition:opacity 0.2s ease;">${instructionText}</div>
-                    <div class="nav-gps-quality" id="nav-gps-quality" style="font-size:11px;color:#999;margin-top:2px;"></div>
-                </div>
-
-                <!-- 核心数据：距离 + 时间 -->
-                <div class="nav-info">
-                    <div class="nav-distance" id="nav-distance">${distText}</div>
-                    <div class="nav-eta" id="nav-eta">${etaText}</div>
-                </div>
-
-                <!-- 进度条 -->
-                <div class="nav-progress-bar-container" style="padding:0 16px;margin-bottom:4px;">
-                    <div style="display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-bottom:2px;">
-                        <span id="nav-progress-text">已完成 0%</span>
-                        <span id="nav-dist-traveled">已走 0m</span>
-                    </div>
-                    <div style="width:100%;height:4px;background:#e0e0e0;border-radius:2px;overflow:hidden;">
-                        <div id="nav-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg,#4caf50,#28a745);border-radius:2px;transition:width 0.5s ease;"></div>
-                    </div>
-                </div>
-
-                <!-- 附加信息行：速度 | 精度 | 更新时间 -->
-                <div class="nav-extra-info" id="nav-extra-info" style="display:flex;justify-content:space-between;font-size:11px;color:#888;padding:6px 16px 4px;border-top:1px solid #f0f0f0;">
-                    <span id="nav-speed" title="当前速度">-- m/s</span>
-                    <span id="nav-gps-acc" title="GPS精度">± --m</span>
-                    <span id="nav-update-time" title="数据更新于">刚刚更新</span>
-                </div>
-
-                <!-- 偏离提示 -->
-                <div class="nav-deviation" id="nav-deviation" style="display:none;padding:4px 16px;font-size:12px;color:#e67e22;background:#fff8e1;border-radius:4px;margin:4px 16px 0;"></div>
-
-                <!-- 重规划状态 -->
-                <div class="nav-reroute-info" id="nav-reroute-info" style="display:none;"></div>
-
-                <button class="nav-cancel-btn" onclick="stopRealTimeNavigation()">✕ 取消导航</button>
-            </div>`;
-        document.body.appendChild(panel);
-    }
-    panel.style.display='block';
-
-    // 移动端：根据控制面板状态调整导航面板位置
-    if (isMobile) {
-        const ctrlPanel = document.getElementById('control-panel');
-        if (ctrlPanel && ctrlPanel.classList.contains('open')) {
-            panel.style.bottom = 'calc(12px + 65vh)';
-        } else {
-            panel.style.bottom = '12px';
-        }
-    }
-
-    // 启动1秒刷新定时器（用于时钟、ETA倒计时等）
-    startNavPanelRefreshTimer();
-}
-
-function updateNavigationPanel(data){
-    const arrowEl=document.getElementById('nav-arrow'),instructionEl=document.getElementById('nav-instruction');
-    const distanceEl=document.getElementById('nav-distance'),etaEl=document.getElementById('nav-eta');
-    const deviationEl=document.getElementById('nav-deviation'),rerouteInfoEl=document.getElementById('nav-reroute-info');
-    const speedEl=document.getElementById('nav-speed');
-    const gpsQualityEl=document.getElementById('nav-gps-quality');
-    const gpsAccEl=document.getElementById('nav-gps-acc');
-    const updateTimeEl=document.getElementById('nav-update-time');
-
-    // 方向箭头
-    if(data.nextTurn&&arrowEl)arrowEl.textContent=getDirectionArrow(data.nextTurn.bearing);
-
-    // 导航指令（带淡入过渡效果）
-    if(instructionEl&&data.instruction){
-        if(instructionEl.textContent!==data.instruction){
-            instructionEl.style.opacity='0';
-            setTimeout(()=>{instructionEl.textContent=data.instruction;instructionEl.style.opacity='1';},150);
-        }
-    }else if(instructionEl&&data.nextTurn){
-        instructionEl.textContent=`向${data.nextTurn.direction} ${data.nextTurn.distance}米`;
-    }
-
-    // 距离和ETA（实时更新）
-    if(distanceEl)distanceEl.textContent=`剩余 ${data.remainingDistance} 米`;
-    if(etaEl)etaEl.textContent=`约 ${data.etaMinutes} 分钟`;
-
-    // 速度显示
-    if(speedEl&&data.speed!==undefined){
-        const spd = data.speed > 0 ? `${data.speed.toFixed(1)} m/s` : '-- m/s';
-        speedEl.textContent = spd;
-        if(data.speed > 2.5) speedEl.style.color = '#28a745';  // 快
-        else if(data.speed > 1) speedEl.style.color = '#666';   // 正常
-        else speedEl.style.color = '#999';                       // 慢/静止
-    }
-
-    // GPS质量显示
-    if(gpsQualityEl&&data.quality){
-        const qInfo={excellent:{label:'GPS高精度',color:'#28a745'},good:{label:'GPS良好',color:'#28a745'},
-            fair:{label:'GPS一般',color:'#ffc107'},poor:{label:'GPS较差',color:'#fd7e14'},
-            very_poor:{label:'信号弱',color:'#dc3545'},unknown:{label:'',color:'#999'}};
-        const qi=qInfo[data.quality]||qInfo.unknown;
-        gpsQualityEl.textContent=qi.label;
-        gpsQualityEl.style.color=qi.color;
-    }
-
-    // GPS精度实时更新
-    if(gpsAccEl&&data.distToEnd!==undefined&&lastPosition&&lastPosition.accuracy!==undefined){
-        const acc = lastPosition.accuracy;
-        const accText = acc < 1000 ? `±${Math.round(acc)}m` : '低精度';
-        gpsAccEl.textContent = accText;
-        if (acc <= 15) gpsAccEl.style.color = '#28a745';
-        else if (acc <= 50) gpsAccEl.style.color = '#ffc107';
-        else gpsAccEl.style.color = '#fd7e14';
-    }
-
-    // 数据更新时间戳（精确到秒）
-    if(updateTimeEl){
-        const now = new Date();
-        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-        updateTimeEl.textContent = `数据更新 ${timeStr}`;
-        updateTimeEl.style.color = '#28a745';
-    }
-
-    // 偏离提示
-    if(deviationEl){
-        if(data.deviation>0&&!data.rerouting){deviationEl.textContent=`⚠️ 偏离路线 ${data.deviation} 米`;deviationEl.style.display='block';deviationEl.className='nav-deviation';}
-        else deviationEl.style.display='none';
-    }
-
-    // 重规划状态
-    if(rerouteInfoEl){
-        if(data.maxReroutesReached){rerouteInfoEl.innerHTML='⛔ 已达最大重算次数';rerouteInfoEl.style.display='block';}
-        else if(data.deviation>REROUTE_DEVIATION_THRESHOLD&&!data.rerouting){rerouteInfoEl.innerHTML='🔄 正在重新规划...';rerouteInfoEl.style.display='block';}
-        else rerouteInfoEl.style.display='none';
-    }
-
-    // 状态栏
-    const statusEl=document.getElementById('nav-status');
-    if(statusEl)statusEl.classList.toggle('rerouting',!!data.rerouting);
+    stopRealTimeLocation();showToast('导航已结束');
 }
 
 function getDirectionArrow(bearing){
     const arrows=['↑','↗','→','↘','↓','↙','←','↖'];
     return arrows[Math.round(bearing/45)%8];
-}
-
-function hideNavigationPanel(){const panel=document.getElementById('navigation-panel');if(panel)panel.style.display='none';}
-
-/**
- * 导航面板1秒刷新定时器：实时更新时钟、进度、数据时效
- * 即使GPS数据未更新，也能保持界面时间信息的动态显示
- */
-function startNavPanelRefreshTimer() {
-    if (navPanelRefreshTimer) {
-        clearInterval(navPanelRefreshTimer);
-        navPanelRefreshTimer = null;
-    }
-    navPanelRefreshTimer = setInterval(() => {
-        if (!isRealTimeNavigating) {
-            clearInterval(navPanelRefreshTimer);
-            navPanelRefreshTimer = null;
-            return;
-        }
-
-        // 1. 实时时钟更新（每秒刷新）
-        const clockEl = document.getElementById('nav-clock');
-        if (clockEl) {
-            const now = new Date();
-            clockEl.textContent = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-        }
-
-        // 2. 数据时效指示器：显示距离上次GPS更新的时间
-        const updateTimeEl = document.getElementById('nav-update-time');
-        if (updateTimeEl) {
-            if (lastGPSUpdateTime > 0) {
-                const elapsed = Date.now() - lastGPSUpdateTime;
-                if (elapsed < 2000) {
-                    updateTimeEl.textContent = '刚刚更新';
-                    updateTimeEl.style.color = '#28a745';
-                } else if (elapsed < 10000) {
-                    updateTimeEl.textContent = `${Math.round(elapsed/1000)}秒前`;
-                    updateTimeEl.style.color = '#888';
-                } else if (elapsed < 30000) {
-                    updateTimeEl.textContent = `${Math.round(elapsed/1000)}秒前`;
-                    updateTimeEl.style.color = '#e67e22';
-                } else {
-                    updateTimeEl.textContent = `${Math.round(elapsed/1000)}秒前`;
-                    updateTimeEl.style.color = '#dc3545';
-                }
-            }
-        }
-
-        // 3. 更新GPS精度显示
-        if (lastPosition && lastPosition.accuracy !== undefined) {
-            const gpsAccEl = document.getElementById('nav-gps-acc');
-            if (gpsAccEl) {
-                const acc = lastPosition.accuracy;
-                const accText = acc < 1000 ? `±${Math.round(acc)}m` : '低精度';
-                gpsAccEl.textContent = accText;
-                if (acc <= 15) gpsAccEl.style.color = '#28a745';
-                else if (acc <= 50) gpsAccEl.style.color = '#ffc107';
-                else gpsAccEl.style.color = '#fd7e14';
-            }
-        }
-
-        // 4. 更新进度条和已行走距离
-        if (navigationStartTime > 0) {
-            const progressEl = document.getElementById('nav-progress-text');
-            const progressBarEl = document.getElementById('nav-progress-bar');
-            const distTraveledEl = document.getElementById('nav-dist-traveled');
-
-            if (navTotalDistance > 0) {
-                const traveled = Math.min(totalDistanceTraveled, navTotalDistance);
-                const progress = Math.min((traveled / navTotalDistance) * 100, 100);
-                if (progressEl) progressEl.textContent = `已完成 ${Math.round(progress)}%`;
-                if (progressBarEl) progressBarEl.style.width = `${progress}%`;
-                if (distTraveledEl) distTraveledEl.textContent = `已走 ${Math.round(traveled)}m`;
-            }
-
-            // 5. 动态ETA重算（即使没有新GPS，基于时间的消耗也更新ETA）
-            const distanceEl = document.getElementById('nav-distance');
-            if (distanceEl && navigationPath && navigationPath.length > 1) {
-                // 仅当没有新GPS数据时，基于时间重新估算剩余距离
-                const timeSinceUpdate = Date.now() - lastNavUpdateTime;
-                if (timeSinceUpdate > 2000 && lastPosition && smoothedSpeed > 0.3) {
-                    const etaEl = document.getElementById('nav-eta');
-                    if (etaEl) {
-                        // 使用当前剩余距离减去估算的已行走距离
-                        const speedDelta = smoothedSpeed * (timeSinceUpdate / 1000);
-                        const currentRemaining = parseInt(distanceEl.textContent.replace(/\D/g,'')) || 0;
-                        const adjustedRemaining = Math.max(0, currentRemaining - speedDelta);
-                        if (adjustedRemaining > 0 && adjustedRemaining < currentRemaining) {
-                            const etaSeconds = adjustedRemaining / (smoothedSpeed || 1.4);
-                            etaEl.textContent = `约 ${Math.ceil(etaSeconds / 60)} 分钟`;
-                        }
-                    }
-                }
-            }
-        }
-    }, 1000);
 }
 
 function updateNavigationUI(){
@@ -2305,14 +2031,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(handle)handle.addEventListener('click',()=>{
         const panel=document.getElementById('control-panel');
         if(panel)panel.classList.toggle('open');
-        // 移动端：调整导航面板位置
-        if (isMobile) {
-            const navPanel = document.getElementById('navigation-panel');
-            if (navPanel && navPanel.style.display !== 'none') {
-                const ctrlOpen = panel.classList.contains('open');
-                navPanel.style.bottom = ctrlOpen ? 'calc(12px + 65vh)' : '12px';
-            }
-        }
     });
     // 移动端面板拖拽初始化
     initPanelTouchDrag();
@@ -2329,12 +2047,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (panelEl) {
             const observer = new MutationObserver(() => {
                 setTimeout(() => { if (map) map.invalidateSize(); }, 350);
-                // 导航面板位置联动
-                const navPanel = document.getElementById('navigation-panel');
-                if (navPanel && navPanel.style.display !== 'none') {
-                    const isOpen = panelEl.classList.contains('open');
-                    navPanel.style.bottom = isOpen ? 'calc(12px + 65vh)' : '12px';
-                }
             });
             observer.observe(panelEl, { attributes: true, attributeFilter: ['class'] });
         }
