@@ -1064,9 +1064,9 @@ button {
 
 /* ==================== 实时定位导航样式 ==================== */
 
-/* 用户位置标记 */
+/* 用户位置标记 - 隐藏蓝色箭头 */
 .user-location-marker {
-    z-index: 1000 !important;
+    display: none !important;
 }
 
 .user-location-inner {
