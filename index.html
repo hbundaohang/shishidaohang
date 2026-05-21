@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>校园导航 - 智能助手</title>
-    <!-- 使用本地Leaflet库文件 -->
-    <link rel="stylesheet" href="./libs/leaflet.min.css" />
+    <!-- 使用CDN Leaflet库 + 国内可用瓦片 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="./style.css">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -115,7 +115,7 @@
         </div>
     </div>
 
-    <script src="./libs/leaflet.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="./map.js"></script>
 
     <!-- 定位权限请求弹窗 -->
@@ -123,7 +123,7 @@
         <div class="permission-dialog">
             <div class="permission-icon">📍</div>
             <h3 class="permission-title">需要定位权限</h3>
-            <p class="permission-desc" id="permission-desc">为了提供准确的实时导航和位置服务，需要获取您的当前位置。您的位置信息仅用于导航，不会被存储或上传。</p>
+            <p class="permission-desc" id="permission-desc">为了提供准确的实时导航和位置服务，需要获取您的当前位置。您的位置信息仅用于导航，不会被存储。</p>
             <div class="permission-btns">
                 <button class="permit-deny-btn" id="permission-deny-btn">拒绝</button>
                 <button class="permit-allow-btn" id="permission-allow-btn">允许定位</button>
