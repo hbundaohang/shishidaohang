@@ -119,7 +119,7 @@ const CAMPUS_DATA = {
     {"from":101,"to":256,"distance":30},{"from":256,"to":102,"distance":115},{"from":102,"to":140,"distance":145},
     {"from":140,"to":117,"distance":45},{"from":117,"to":120,"distance":50},{"from":120,"to":104,"distance":75},
     {"from":140,"to":134,"distance":150},{"from":104,"to":109,"distance":75},{"from":109,"to":275,"distance":50},
-    {"from":275,"to":276,"distance":35},{"from":276,"to":254,"distance":80},{"from":122,"to":124,"distance":90},
+    {"from":275,"to":276,"distance":35},{"from":276,"to":254,"distance":80},{"from":254,"to":255,"distance":118},{"from":122,"to":124,"distance":90},
     {"from":104,"to":200,"distance":80},{"from":104,"to":121,"distance":150},{"from":200,"to":121,"distance":115},
     {"from":275,"to":121,"distance":60},{"from":200,"to":201,"distance":95},{"from":201,"to":122,"distance":120},
     {"from":201,"to":202,"distance":120},{"from":202,"to":242,"distance":100},{"from":121,"to":122,"distance":95},
